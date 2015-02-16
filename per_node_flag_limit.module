@@ -1,0 +1,88 @@
+<?php
+/*
+ * @file Per Node Flag Limit
+ *
+ * This module has one goals:
+ *
+ * 1. Limit each node to being flagged by only one user for a specific flag type
+ *
+ */
+ 
+ 
+ /**
+ * Implements hook_menu().
+ */
+function per_node_flag_limit_menu() {
+  $items = array();
+  $items['admin/build/flags/limits'] = array(
+    'title' => 'Per Node Limits',
+    'description' => 'Set the maximum number number of a specific flag on a per node basis.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('per_node_flag_limit_settings_form'),
+    'access arguments' => array('administer flags'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  return $items;
+}
+
+/**
+ * Flag settings form.
+ */
+function per_node_flag_limit_settings_form(&$form) {
+  $form = array();
+  
+  $flags = flag_get_flags('node');
+  
+  // Get types and sort them
+  $types = node_get_types('names');
+  asort($types);
+  
+  foreach($flags as $flag) {
+    $form['per_node_flag_limit_' . $flag->name . '_fieldgroup']= array(
+	  '#title' =>t('!flag', array('!flag' => $flag->title)),
+	  '#type' =>'fieldset',
+	  '#collapsible' => TRUE,
+	  '#collapsed' => TRUE,
+	  '#description' =>t('Per node flag limit settings for <em>!flag</em>.', array('!flag' => $flag->title)),
+	);
+    $form['per_node_flag_limit_' . $flag->name . '_fieldgroup']['per_node_flag_limit_' . $flag->name]= array(
+      '#type' => 'checkbox',
+      '#title' => t('Impose a per node limit on !flag', array('!flag' => $flag->title)),
+      '#default_value' => variable_get('per_node_flag_limit_' . $flag->name, FALSE),
+    );
+    $form['per_node_flag_limit_' . $flag->name . '_fieldgroup']['per_node_flag_limit_'. $flag->name .  '_' . 'msg']= array(
+      '#type' => 'textfield',
+      '#title' => t('!flag ' . $type->name . ' limit reached text', array('!flag' => $flag->title)),
+      '#description' => t('Message to display when the maximum number of <em>!flag</em> flags has been placed on a piece of content.', array('!flag' => $flag->title)),
+      '#default_value' => variable_get('per_node_flag_limit_'. $flag->name .  '_' . 'msg', NULL),
+    );	
+    foreach ($types as $type=>$name) {
+      $form['per_node_flag_limit_' . $flag->name . '_fieldgroup']['per_node_flag_limit_'. $flag->name .  '_' . $type .  '_value']= array(
+        '#type' => 'textfield',
+        '#title' => t($name . ' <em>!flag</em>' . ' limit', array('!flag' => $flag->title)),
+        '#description' => t('Maximum number of <em>!flag</em> flags that can be on a single <em>!type</em>', array('!flag' => $flag->title, '!type' => $name)),
+        '#default_value' => variable_get('per_node_flag_limit_'. $flag->name .  '_' . $type .  '_value', NULL),
+      );
+	}
+  }  
+  return system_settings_form($form);
+}
+
+/**
+ * Implementation of hook_flag(). Trigger actions if any are available.
+ */
+function per_node_flag_limit_flag($action, $flag, $content_id, $account) {
+  $limited = variable_get('per_node_flag_limit_' . $flag->name, FALSE);
+  if ($action == 'flag' && $limited) {
+
+    $node = node_load(array('nid' => $content_id));
+    $type = $node->type;  
+    
+	// Get the flag limit.
+    $limit = variable_get('per_node_flag_limit_'. $flag->name .  '_' . $type .  '_value', NULL);
+
+	if ($flag->get_count($content_id) > $limit) {    
+      flag('unflag', $flag->name, $content_id, $account);
+    }
+  }
+}

@@ -1,0 +1,5 @@
+; $Id$
+name = "Per Node Flag Limit"
+description = "Allows a per node limit to be applied to flags. The original use of this module is to allow Flag to be used for signing up for nodes that are shifts in a schedule."
+core = 6.x
+dependencies[] = flag
